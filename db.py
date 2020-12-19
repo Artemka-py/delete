@@ -29,6 +29,15 @@ def insert_single_value(table: str, field: str, value):
     conn.commit()
 
 
+def update_single_value(table: str, field: str, value, id_str):
+    cur.execute(
+        f"UPDATE {table} SET"
+        f" {field} = {value} "
+        f" WHERE {table}.id = {id_str}"
+    )
+    conn.commit()
+
+
 def fetchall(table: str, columns: List[str], where: str) -> List[Tuple]:
     columns_joined = ", ".join(columns)
     cur.execute(f"SELECT {columns_joined} FROM {table} {where}")
