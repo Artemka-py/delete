@@ -16,7 +16,7 @@ dp = Dispatcher(bot, storage=MemoryStorage())
 dp.middleware.setup(LoggingMiddleware())
 
 
-@dp.message_handler(commands=['start'])
+@   dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
     global status
     id = str(message.from_user.id)
@@ -25,7 +25,7 @@ async def process_start_command(message: types.Message):
         for re in res:
             if re['reg_finish'] is None and re['approved'] is None:
                 await message.reply(
-                    "В прошлый раз вы не закончили регистрацию!")  # http://185.43.4.30/register/?tg_id=" + id)
+                    "В прошлый раз вы не закончили регистрацию! http://tripwego.ru/instructors/?teleg_id=" + id)
                 return
             if re['approved'] is None:
                 await message.reply('Вы были зарегистрированны, но ваш статус не подтвержден, пожалуйста обратитесь в '
@@ -38,7 +38,7 @@ async def process_start_command(message: types.Message):
         await message.reply("Вы уже были зарегистрированы в нашем боте и сайте.")
         return
     await message.reply("Приветствуем нового инсруктора TripWeGo! Для дальнейшего нашего сотрудничества пройдите по "
-                        "ссылке и зарегистрируйтесь!")  # http://185.43.4.30/register/?tg_id=" + id)
+                        "ссылке и зарегистрируйтесь! http://tripwego.ru/instructors/?teleg_id=" + id)
     db.insert_single_value('instructors_instructor', "telegram_id, created_at, updated_at",
                            f"{id}, '{datetime.now()}', '{datetime.now()}'")
 
@@ -49,9 +49,9 @@ async def process_help_command(message: types.Message):
                         "зарегистрироваться, после чего получать заявки и зарабатывать бабки)))")
 
 
-@dp.message_handler()
-async def echo_message(msg: types.Message):
-    await bot.send_message(msg.from_user.id, str(msg.from_user.id))
+# @dp.message_handler()
+# async def echo_message(msg: types.Message):
+#     await bot.send_message(msg.from_user.id, str(msg.from_user.id))
 
 
 async def zayavka():
@@ -67,14 +67,30 @@ async def zayavka():
         if len(duplicate): continue
         inline_btn_1 = types.InlineKeyboardButton(f'Принять заявку!', callback_data=f'button {re["id"]}',
                                                   data_id=re["id"])
+        # all_users = db.fetchall("instructors_instructor", ["telegram_id"],
+        #                         f""" left join instructors_instructor_resorts
+        #     on instructors_instructor.id = instructors_instructor_resorts.instructor_id
+        #                 left join instructors_instructor_services on instructors_instructor.id =
+        #     instructors_instructor_services.instructor_id
+        #             where instructors_instructor.approved = true and instructors_instructor.reg_finish = true and
+        #     instructors_instructor_resorts.resort_id = {re["resort_id"]} and instructors_instructor_services.service_id = {re[
+        #                             "service_id"]}""")
         all_users = db.fetchall("instructors_instructor", ["telegram_id"],
-                                f""" left join instructors_instructor_resorts
+                                f"""
+
+left join instructors_instructor_resorts
             on instructors_instructor.id = instructors_instructor_resorts.instructor_id
                         left join instructors_instructor_services on instructors_instructor.id =
             instructors_instructor_services.instructor_id
+    left join instructors_instructor_levels on instructors_instructor.id = instructors_instructor_levels.instructor_id
+            left join instructors_level on instructors_instructor_levels.level_id = instructors_level.id
                     where instructors_instructor.approved = true and instructors_instructor.reg_finish = true and
-            instructors_instructor_resorts.resort_id = {re["resort_id"]} and instructors_instructor_services.service_id = {re[
-                                    "service_id"]}""")
+        instructors_instructor_resorts.resort_id = {re["resort_id"]} and 
+instructors_instructor_services.service_id = {re["service_id"]} and (select level_num from orders_order
+            inner join instructors_level on instructors_level.id = orders_order.level_id
+            where orders_order.id = {re["id"]} ) <= level_num
+""")
+
         for user in all_users:
             inline_kb1 = types.InlineKeyboardMarkup().add(inline_btn_1)
             text_order = db.fetchall("orders_order", ["orders_order.date_time", "orders_resort.title",
@@ -165,7 +181,7 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
     text_order = db.fetchall("orders_order", ["orders_order.date_time", "orders_resort.title",
                                               "instructors_service.price", "instructors_service.title",
                                               "instructors_servicecategory.title", "users_customer.fio",
-                                              "users_level.title", "users_customer.phone_num",
+                                              "instructors_level.title", "users_customer.phone_num",
                                               "orders_messenger.title"],
                              f"""
                     inner join orders_messenger on orders_messenger.id = orders_order.messenger_id
@@ -174,7 +190,7 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
 instructors_servicecategory.id
                 inner join orders_resort on orders_order.resort_id = orders_resort.id
                 inner join users_customer on orders_order.customer_id = users_customer.id
-                inner join users_level on users_customer.level_id = users_level.id
+                inner join instructors_level on orders_order.level_id = instructors_level.id
                         where orders_order.id = {order_id[0]}
     """)
     for text in text_order:
@@ -189,7 +205,7 @@ instructors_servicecategory.id
 Цена: {text["instructors_service.price"]}
 Информация о покупателе:
 ФИО: {text["users_customer.fio"]}.
-Уровень катания: {text["users_level.title"]}.
+Уровень катания: {text["instructors_level.title"]}.
 Номер телефона: {text["users_customer.phone_num"]}.
 Связываться через мессенджер: {text["orders_messenger.title"]}.
     """)
